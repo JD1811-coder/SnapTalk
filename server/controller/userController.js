@@ -96,9 +96,6 @@ exports.deleteUser = async (req, res) => {
 }
 };
 
-// @desc    Upload or update profile picture
-// @route   PUT /api/user/profile-picture
-// @access  Private
 exports.updateProfilePicture = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -123,5 +120,68 @@ exports.updateProfilePicture = async (req, res) => {
   } catch (err) {
     console.error('Update error:', err);
     res.status(500).json({ message: 'Failed to update profile' });
+  }
+};
+exports.toggleMute = async (req, res) => {
+  const targetUserId = req.params.id;
+  const currentUserId = req.user._id;
+
+  try {
+    const currentUser = await User.findById(currentUserId);
+
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const alreadyMuted = currentUser.mutedUsers.includes(targetUserId);
+
+    if (alreadyMuted) {
+      currentUser.mutedUsers = currentUser.mutedUsers.filter(
+        (id) => id.toString() !== targetUserId
+      );
+    } else {
+      currentUser.mutedUsers.push(targetUserId);
+    }
+
+    await currentUser.save();
+
+    res.status(200).json({
+      message: alreadyMuted ? 'User unmuted successfully' : 'User muted successfully',
+    });
+  } catch (error) {
+    console.error('Mute toggle failed:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+exports.toggleBlock = async (req, res) => {
+  const targetUserId = req.params.id;
+  const currentUserId = req.user._id;
+
+  try {
+    const currentUser = await User.findById(currentUserId);
+
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const alreadyBlocked = currentUser.blockedUsers.includes(targetUserId);
+
+    if (alreadyBlocked) {
+      currentUser.blockedUsers = currentUser.blockedUsers.filter(
+        (id) => id.toString() !== targetUserId
+      );
+    } else {
+      currentUser.blockedUsers.push(targetUserId);
+    }
+
+    await currentUser.save();
+
+    res.status(200).json({
+      message: alreadyBlocked ? 'User unblocked successfully' : 'User blocked successfully',
+    });
+  } catch (error) {
+    console.error('Block toggle failed:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 };

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getUsers, getUserById, updateUser, deleteUser,updateProfilePicture} = require('../controller/userController');
+const { getUsers, getUserById, updateUser, deleteUser,updateProfilePicture,toggleMute,toggleBlock} = require('../controller/userController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/upload');
 
@@ -19,7 +19,10 @@ router.delete('/delete/:id', protect, deleteUser);
 router.put(
   '/user/profile-picture',
   protect,
-  upload.single('profilePic'), // This is the actual middleware function
+  upload.single('profilePic'), 
   updateProfilePicture
 );
+router.patch('/user/:id/toggle-mute',protect,toggleMute);
+
+router.patch('/user/:id/toggle-block', protect, toggleBlock);
 module.exports = router; 
