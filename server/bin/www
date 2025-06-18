@@ -1,0 +1,87 @@
+#!/usr/bin/env node
+
+const http = require('http');
+const { Server } = require('socket.io');
+const app = require('../app');
+
+const port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+// Create HTTP server with express app
+const server = http.createServer(app);
+
+// Create Socket.IO server attached to the HTTP server (only once)
+const io = new Server(server, {
+  cors: {
+    origin: ['http://localhost:3000', 'http://localhost:3001','http://localhost:3002'],
+    methods: ['GET', 'POST','PATCH','DELETE'],
+  },
+  transports: ['websocket', 'polling'],
+});
+
+// Make io accessible in routes/controllers via app.set if needed
+app.set('io', io);
+
+// Socket.IO connection handler
+io.on('connection', (socket) => {
+  console.log('🔌 New client connected:', socket.id);
+
+  socket.on('joinRoom', (roomId) => {
+    socket.join(roomId);
+    console.log(`Socket ${socket.id} joined room: ${roomId}`);
+  });
+
+  socket.on('typing', ({ roomId, userId }) => {
+    socket.to(roomId).emit('typing', { userId });
+  });
+
+  socket.on('stop-typing', ({ roomId, userId }) => {
+    socket.to(roomId).emit('stop-typing', { userId });
+  });
+
+  socket.on('message-read', ({ conversationId, userId }) => {
+    socket.to(conversationId).emit('message-read', { conversationId, userId });
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`Socket ${socket.id} disconnected`);
+  });
+});
+
+// Start server listening
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+function normalizePort(val) {
+  const port = parseInt(val, 10);
+  if (isNaN(port)) return val;
+  if (port >= 0) return port;
+  return false;
+}
+
+function onError(error) {
+  if (error.syscall !== 'listen') throw error;
+
+  const bind = typeof port === 'string' ? 'Pipe ' + port : 'Port ' + port;
+
+  switch (error.code) {
+    case 'EACCES':
+      console.error(`${bind} requires elevated privileges`);
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(`${bind} is already in use`);
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+function onListening() {
+  const addr = server.address();
+  const bind = typeof addr === 'string' ? 'pipe ' + addr : 'port ' + addr.port;
+  console.log(`🚀 Listening on ${bind}`);
+}
+
