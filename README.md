@@ -1,10 +1,10 @@
-# SnapTalk 
+![Screenshot (4)](https://github.com/user-attachments/assets/aea262bc-bcfa-4caa-8a61-70c5f02b7a90)# SnapTalk 
 
 SnapTalk is a real-time chat application built using the MERN stack. It allows users to register, login, and chat instantly in a clean, modern interface.
 
 ##  Tech Stack
 
-- **Frontend**: React.js, Tailwind CSS
+- **Frontend**: React.js, Tailwind CSS, MUI
 - **Backend**: Node.js, Express.js
 - **Database**: MongoDB (Mongoose)
 - **Real-time**: Socket.IO
@@ -20,7 +20,8 @@ SnapTalk is a real-time chat application built using the MERN stack. It allows u
 - Secure password hashing with bcrypt
 
 ##  Screenshots
-(Add a few images here if available)
+
+![Screenshot (4)](https://github.com/user-attachments/assets/7e6e1fdb-056f-4914-a7f8-31acdfebf1a8)
 
 ##  Installation
 
