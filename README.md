@@ -1,4 +1,4 @@
-![Screenshot (4)](https://github.com/user-attachments/assets/aea262bc-bcfa-4caa-8a61-70c5f02b7a90)# SnapTalk 
+
 
 SnapTalk is a real-time chat application built using the MERN stack. It allows users to register, login, and chat instantly in a clean, modern interface.
 
@@ -22,6 +22,8 @@ SnapTalk is a real-time chat application built using the MERN stack. It allows u
 ##  Screenshots
 
 ![Screenshot (4)](https://github.com/user-attachments/assets/7e6e1fdb-056f-4914-a7f8-31acdfebf1a8)
+![Screenshot (5)](https://github.com/user-attachments/assets/4063cb90-1766-43be-831e-ecea96843165)
+
 
 ##  Installation
 
