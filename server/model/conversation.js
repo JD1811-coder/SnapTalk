@@ -6,28 +6,32 @@ const conversationSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
-      }
+        required: true,
+      },
     ],
     isGroupChat: {
       type: Boolean,
       default: false,
     },
-    name: { 
+    name: {
       type: String,
-      trim: true
+      trim: true,
     },
-    groupAdmin: { 
-      type: mongoose.Schema.Types.ObjectId, 
+    groupAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: function() {
-        return this.isGroupChat;  // only required if group chat
-      }
+      required: function () {
+        return this.isGroupChat; // only required if group chat
+      },
     },
     latestMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Message',
-    }
+    },
+    groupPic: {
+      type: String,
+      default: '/uploads/groupPics/default-group.png', // 💡 you can change this to whatever your fallback image is
+    },
   },
   { timestamps: true }
 );

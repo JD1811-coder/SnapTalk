@@ -2,31 +2,49 @@ const Conversation = require('../model/conversation');
 const Message = require('../model/message');
 
 // ✅ Create or fetch one-to-one conversation
-exports.createOrGetConversation = async (req, res) => {
-  const { userId } = req.body;
+const User = require('../model/user'); 
 
-  if (!userId) {
-    return res.status(400).json({ message: 'UserId is required' });
+exports.createOrGetConversation = async (req, res) => {
+  const { identifier } = req.body; // username or email
+
+  if (!identifier) {
+    return res.status(400).json({ message: 'Username or email is required' });
   }
 
   try {
+    // 🔍 Find the user by username or email
+    const otherUser = await User.findOne({
+      $or: [{ username: identifier }, { email: identifier }],
+    });
+
+    if (!otherUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // 🛑 Prevent chatting with self
+    if (otherUser._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ message: "You can't chat with yourself" });
+    }
+
+    // 🔁 Try to find existing 1-1 conversation
     let conversation = await Conversation.findOne({
       isGroupChat: false,
-      members: { $all: [req.user._id, userId] }
+      members: { $all: [req.user._id, otherUser._id] },
     }).populate('members', '-password');
 
     if (conversation) {
       return res.status(200).json(conversation);
     }
 
-    // No conversation found, create new
+    // ✨ No conversation? Create new
     conversation = await Conversation.create({
-      members: [req.user._id, userId],
+      members: [req.user._id, otherUser._id],
     });
 
     const fullConversation = await conversation.populate('members', '-password');
     res.status(201).json(fullConversation);
   } catch (error) {
+    console.error('createOrGetConversation error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -92,37 +110,61 @@ exports.getUserConversations = async (req, res) => {
     res.status(500).json({ message: 'Something went wrong' });
   }
 };
-
 exports.createGroupChat = async (req, res) => {
-  const { name, members } = req.body;
-
-  if (!name || !members || members.length < 2) {
-    return res.status(400).json({ message: 'Group name and at least 2 members are required' });
-  }
+  const { name } = req.body;
+  let members = [];
 
   try {
-    // Ensure members array doesn't include duplicates, and add the logged-in user
-    const allMembersSet = new Set(members.map(m => m.toString()));
-    allMembersSet.add(req.user._id.toString());
+    // ✅ Parse member list
+    if (req.body.members) {
+      members = JSON.parse(req.body.members); // expecting array of emails/usernames
+    }
 
-    const allMembers = Array.from(allMembersSet);
+    // ⚠️ Validation
+    if (!name?.trim()) {
+      return res.status(400).json({ message: 'Group name is required' });
+    }
+    if (!Array.isArray(members) || members.length < 2) {
+      return res.status(400).json({ message: 'At least 2 group members required' });
+    }
 
-    const groupChat = await Conversation.create({
-      name,
-      isGroupChat: true,
-      members: allMembers,
-      groupAdmin: req.user._id
+    // 🔍 Resolve users by email or username
+    const users = await User.find({
+      $or: [
+        { email: { $in: members } },
+        { username: { $in: members } },
+      ]
     });
 
-    // ✅ Correct population: refetch and populate
+    if (!users.length || users.length < 2) {
+      return res.status(404).json({ message: 'Some members not found. Minimum 2 valid members required.' });
+    }
+
+    // 💡 Add current user to group
+    const allUserIds = [...users.map(u => u._id.toString()), req.user._id.toString()];
+    const uniqueUserIds = [...new Set(allUserIds)];
+
+    // 📸 Group profile pic path
+    const groupPic = req.file ? `/uploads/groupPics/${req.file.filename}` : undefined;
+
+    // ✅ Create group
+    const groupChat = await Conversation.create({
+      name: name.trim(),
+      isGroupChat: true,
+      members: uniqueUserIds,
+      groupAdmin: req.user._id,
+      groupPic,
+    });
+
+
     const fullGroupChat = await Conversation.findById(groupChat._id)
       .populate('members', '-password')
       .populate('groupAdmin', '-password');
 
     res.status(201).json(fullGroupChat);
   } catch (error) {
-    console.error('Error creating group chat:', error);
-    res.status(500).json({ message: error.message });
+    console.error('❌ Error creating group chat:', error);
+    res.status(500).json({ message: 'Server error while creating group' });
   }
 };
 
