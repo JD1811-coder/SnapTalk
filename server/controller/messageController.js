@@ -41,18 +41,29 @@ exports.sendMessage = async (req, res) => {
 
 
 };
-// Get all messages in a conversation
 exports.getMessages = async (req, res) => {
-  try {
-    const messages = await Message.find({ conversation: req.params.conversationId })
-      .populate('sender', '-password')
-      .sort({ createdAt: 1 });
+  const { conversationId } = req.params;
+  const userId = req.user._id;
 
-    res.status(200).json(messages);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  try {
+    const msgs = await Message.find({ conversation: conversationId })
+      .sort('createdAt')
+      .populate('sender', 'username profilePic');
+
+    // Mark unread messages as read by current user
+    const unreadMessages = msgs.filter(m => !m.readBy.includes(userId));
+    await Message.updateMany(
+      { _id: { $in: unreadMessages.map(m => m._id) } },
+      { $push: { readBy: userId } }
+    );
+
+    res.json(msgs);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error fetching messages' });
   }
 };
+
 exports.updateMessage = async (req, res) => {
   const { id } = req.params;
   const { text } = req.body;

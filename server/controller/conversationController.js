@@ -1,8 +1,16 @@
 const Conversation = require('../model/conversation');
 const Message = require('../model/message');
+const User = require('../model/user'); 
 
 // ✅ Create or fetch one-to-one conversation
-const User = require('../model/user'); 
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select("-password"); // exclude sensitive data
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 exports.createOrGetConversation = async (req, res) => {
   const { identifier } = req.body; // username or email
@@ -79,75 +87,65 @@ exports.getOtherParticipant = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 exports.getUserConversations = async (req, res) => {
-  try {
-    const conversations = await Conversation.find({
-      members: { $in: [req.user._id] },
-    })
-      .populate('members', '-password')
-      .sort({ updatedAt: -1 });
+  const userId = req.user._id;
 
-    const result = await Promise.all(
-      conversations.map(async (conv) => {
-        const latestMessage = await Message.findOne({
-          conversation: conv._id,
-        })
-          .sort({ createdAt: -1 })
-          .populate('sender', 'username');
+  const conversations = await Conversation.find({ members: userId })
+    .populate('members', '-password')
+    .sort({ updatedAt: -1 });
 
-        const convObj = conv.toObject();
-        return {
-          ...convObj,
-          latestMessage: latestMessage || null,
-        };
-      })
-    );
+  const enriched = await Promise.all(conversations.map(async (conv) => {
+    const latestMessage = await Message.findOne({ conversation: conv._id })
+      .sort('-createdAt')
+      .populate('sender', 'username');
 
-    res.status(200).json(result);
-  } catch (err) {
-    console.error('❌ Error in getUserConversations:', err);
-    res.status(500).json({ message: 'Something went wrong' });
-  }
+    const unreadCount = await Message.countDocuments({
+      conversation: conv._id,
+      sender: { $ne: userId },
+      readBy: { $ne: userId },
+    });
+
+    return {
+      ...conv.toObject(),
+      latestMessage: latestMessage || null,
+      unreadCount
+    };
+  }));
+
+  res.json(enriched);
 };
 exports.createGroupChat = async (req, res) => {
   const { name } = req.body;
   let members = [];
 
   try {
-    // ✅ Parse member list
     if (req.body.members) {
-      members = JSON.parse(req.body.members); // expecting array of emails/usernames
+      members = JSON.parse(req.body.members); // Should be an array of user IDs
     }
 
-    // ⚠️ Validation
+    console.log("🧪 Parsed members array:", members);
+
     if (!name?.trim()) {
       return res.status(400).json({ message: 'Group name is required' });
     }
+
     if (!Array.isArray(members) || members.length < 2) {
       return res.status(400).json({ message: 'At least 2 group members required' });
     }
 
-    // 🔍 Resolve users by email or username
-    const users = await User.find({
-      $or: [
-        { email: { $in: members } },
-        { username: { $in: members } },
-      ]
-    });
+    // Ensure users exist
+    const users = await User.find({ _id: { $in: members } });
 
     if (!users.length || users.length < 2) {
-      return res.status(404).json({ message: 'Some members not found. Minimum 2 valid members required.' });
+      return res.status(404).json({ message: 'Minimum 2 valid users required.' });
     }
 
-    // 💡 Add current user to group
+    // Add current user if not already
     const allUserIds = [...users.map(u => u._id.toString()), req.user._id.toString()];
     const uniqueUserIds = [...new Set(allUserIds)];
 
-    // 📸 Group profile pic path
     const groupPic = req.file ? `/uploads/groupPics/${req.file.filename}` : undefined;
 
-    // ✅ Create group
     const groupChat = await Conversation.create({
       name: name.trim(),
       isGroupChat: true,
@@ -156,15 +154,14 @@ exports.createGroupChat = async (req, res) => {
       groupPic,
     });
 
-
     const fullGroupChat = await Conversation.findById(groupChat._id)
-      .populate('members', '-password')
-      .populate('groupAdmin', '-password');
+      .populate("members", "-password")
+      .populate("groupAdmin", "-password");
 
     res.status(201).json(fullGroupChat);
   } catch (error) {
-    console.error('❌ Error creating group chat:', error);
-    res.status(500).json({ message: 'Server error while creating group' });
+    console.error("❌ Error creating group chat:", error);
+    res.status(500).json({ message: "Server error while creating group" });
   }
 };
 
@@ -285,5 +282,59 @@ exports.deleteGroupChat = async (req, res) => {
       status: 'Fail',
       message: error.message,
     });
+  }
+};
+exports.markMessagesAsRead = async (req, res) => {
+  const userId = req.user._id;
+  const { conversationId } = req.body;
+
+  console.log(`🔥 markMessagesAsRead called by ${userId} for conversation ${conversationId}`);
+
+  if (!conversationId) {
+    console.log('❌ No conversationId');
+    return res.status(400).json({ message: 'conversationId is required' });
+  }
+
+  try {
+    const updated = await Message.updateMany(
+      {
+        conversation: conversationId,
+        readBy: { $ne: userId }
+      },
+      { $push: { readBy: userId } }
+    );
+
+    console.log(`✅ Updated ${updated.modifiedCount || updated.nModified} messages as read`);
+
+    const io = req.app.get('io');
+    const conversation = await Conversation.findById(conversationId).populate('members', '_id');
+
+    if (!conversation) {
+      console.log('❌ Conversation not found');
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+
+    for (const member of conversation.members) {
+      const memberId = member._id.toString();
+
+      const unreadCount = await Message.countDocuments({
+        conversation: conversationId,
+        sender: { $ne: memberId },
+        readBy: { $ne: memberId }
+      });
+
+      console.log(`📤 Emitting unread-updated for ${memberId}: ${unreadCount}`);
+
+      io.to(conversationId).emit('unread-updated', {
+        conversationId,
+        userId: memberId,
+        unreadCount
+      });
+    }
+
+    res.status(200).json({ message: 'Messages marked as read' });
+  } catch (error) {
+    console.error('❌ markMessagesAsRead error:', error);
+    res.status(500).json({ message: error.message });
   }
 };

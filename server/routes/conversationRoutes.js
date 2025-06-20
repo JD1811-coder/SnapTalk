@@ -10,9 +10,13 @@ const {
   addMemberToGroup,
   removeGroupMember,
   deleteGroupChat,
-  getOtherParticipant
+  getOtherParticipant,
+  getAllUsers,
+  markMessagesAsRead
 } = require('../controller/conversationController');
 const upload = multer({ dest: 'uploads/groupPics/' }); 
+
+router.get("/all", protect, getAllUsers);
 router.post('/', protect, createOrGetConversation); // Create/get one-to-one convo
 router.get('/:conversationId/participant', protect, getOtherParticipant);
 router.get('/', protect, getUserConversations);     // Get all user's convos
@@ -20,6 +24,7 @@ router.post('/group',protect,upload.single('groupPic'),createGroupChat);//create
 router.patch('/group/add-member', protect, addMemberToGroup);
 router.patch('/group/remove-member', protect, removeGroupMember);
 router.delete('/group/delete-group/:id', protect, deleteGroupChat);
+router.post('/mark-as-read', protect, markMessagesAsRead);
 
 
 module.exports = router;

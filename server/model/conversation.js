@@ -17,6 +17,10 @@ const conversationSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    groupName:{
+      type:String,
+      trim:true,
+    },
     groupAdmin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -28,9 +32,12 @@ const conversationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Message',
     },
+    unreadCount:{ 
+      type: Number,
+    } ,
     groupPic: {
       type: String,
-      default: '/uploads/groupPics/default-group.png', // 💡 you can change this to whatever your fallback image is
+      default: '/uploads/groupPics/default-group.png', 
     },
   },
   { timestamps: true }

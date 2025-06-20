@@ -21,10 +21,15 @@ const io = new Server(server, {
 
 // Make io accessible in routes/controllers via app.set if needed
 app.set('io', io);
-
-// Socket.IO connection handler
 io.on('connection', (socket) => {
   console.log('🔌 New client connected:', socket.id);
+
+  // 👇 Fetch user ID from client (recommended via handshake query or auth)
+  const userId = socket.handshake.query?.userId;
+  if (userId) {
+    socket.join(userId); // 👈 this makes individual events possible
+    console.log(`✅ Socket ${socket.id} joined personal room: ${userId}`);
+  }
 
   socket.on('joinRoom', (roomId) => {
     socket.join(roomId);
@@ -39,9 +44,6 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('stop-typing', { userId });
   });
 
-  socket.on('message-read', ({ conversationId, userId }) => {
-    socket.to(conversationId).emit('message-read', { conversationId, userId });
-  });
 
   socket.on('disconnect', () => {
     console.log(`Socket ${socket.id} disconnected`);
