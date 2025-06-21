@@ -12,7 +12,8 @@ const {
   deleteGroupChat,
   getOtherParticipant,
   getAllUsers,
-  markMessagesAsRead
+  markMessagesAsRead,
+  getConversationDetails
 } = require('../controller/conversationController');
 const upload = multer({ dest: 'uploads/groupPics/' }); 
 
@@ -25,6 +26,6 @@ router.patch('/group/add-member', protect, addMemberToGroup);
 router.patch('/group/remove-member', protect, removeGroupMember);
 router.delete('/group/delete-group/:id', protect, deleteGroupChat);
 router.post('/mark-as-read', protect, markMessagesAsRead);
-
+router.get('/details/:conversationId', protect,getConversationDetails);
 
 module.exports = router;

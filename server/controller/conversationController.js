@@ -338,3 +338,36 @@ exports.markMessagesAsRead = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+exports.getConversationDetails = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user._id;
+
+    const conversation = await Conversation.findById(conversationId)
+      .populate('members', 'username email profilePic bio')
+      .populate('groupAdmin', 'username email profilePic')
+      .populate({
+        path: 'latestMessage',
+        populate: {
+          path: 'sender',
+          select: 'username profilePic'
+        }
+      });
+
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+
+    if (!conversation.isGroupChat) {
+      const otherUser = conversation.members.find(
+        (m) => m._id.toString() !== userId.toString()
+      );
+      return res.json(otherUser); // return just the other user
+    }
+
+    res.json(conversation);
+  } catch (error) {
+    console.error('❌ getConversationDetails error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
