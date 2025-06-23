@@ -364,3 +364,30 @@ exports.getConversationDetails = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+exports.updateGroupChat = async (req, res) => {
+  const { conversationId, name } = req.body;
+
+  if (!conversationId) return res.status(400).json({ message: 'conversationId required' });
+
+  try {
+    const group = await Conversation.findById(conversationId);
+    if (!group || !group.isGroupChat) return res.status(404).json({ message: 'Group not found' });
+
+    if (group.groupAdmin.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only group admin can update' });
+    }
+
+    if (name) group.name = name;
+    if (req.file) group.groupPic = `/uploads/groupPics/${req.file.filename}`;
+
+    await group.save();
+    const updatedGroup = await Conversation.findById(group._id)
+      .populate("members", "-password")
+      .populate("groupAdmin", "-password");
+
+    res.status(200).json(updatedGroup);
+  } catch (err) {
+    console.error("❌ updateGroupChat error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
