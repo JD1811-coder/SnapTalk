@@ -1,11 +1,11 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const conversationSchema = new mongoose.Schema(
   {
     members: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: "User",
         required: true,
       },
     ],
@@ -17,30 +17,31 @@ const conversationSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    groupName:{
-      type:String,
-      trim:true,
+    groupName: {
+      type: String,
+      trim: true,
     },
     groupAdmin: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: function () {
         return this.isGroupChat; // only required if group chat
       },
     },
     latestMessage: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Message',
+      ref: "Message",
     },
-    unreadCount:{ 
+    unreadCount: {
       type: Number,
-    } ,
+    },
     groupPic: {
       type: String,
-      default: '/uploads/groupPics/default-group.png', 
+      default: "/uploads/groupPics/default-group.png",
     },
+    isSystem: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Conversation', conversationSchema);
+module.exports = mongoose.model("Conversation", conversationSchema);
