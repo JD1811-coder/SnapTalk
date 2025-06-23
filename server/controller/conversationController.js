@@ -358,13 +358,6 @@ exports.getConversationDetails = async (req, res) => {
       return res.status(404).json({ message: 'Conversation not found' });
     }
 
-    if (!conversation.isGroupChat) {
-      const otherUser = conversation.members.find(
-        (m) => m._id.toString() !== userId.toString()
-      );
-      return res.json(otherUser); // return just the other user
-    }
-
     res.json(conversation);
   } catch (error) {
     console.error('❌ getConversationDetails error:', error);
