@@ -11,6 +11,7 @@ const messageSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    file: { type: String },
     conversation: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Conversation",
@@ -24,6 +25,16 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    reactions: [
+  {
+    emoji: String,
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+  },
+],
+
 
     readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     unreadBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],

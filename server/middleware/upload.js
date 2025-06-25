@@ -1,31 +1,40 @@
-const multer = require('multer');
-const path = require('path');
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
-// Storage config
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/profilePics/');
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    cb(null, uniqueName);
-  },
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only JPEG, PNG, and JPG files are allowed'), false);
+// ✅ Function to generate upload config for different folders
+const upload = (folderPath, allowedMimeTypes = [], maxSizeMB = 100) => {
+  // Ensure the folder exists
+  const fullFolderPath = path.join(__dirname, "..", folderPath);
+  if (!fs.existsSync(fullFolderPath)) {
+    fs.mkdirSync(fullFolderPath, { recursive: true });
   }
-};
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
-});
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, fullFolderPath);
+    },
+    filename: function (req, file, cb) {
+      const ext = path.extname(file.originalname);
+      const base = path.basename(file.originalname, ext).replace(/\s+/g, "-");
+      const timestamp = Date.now();
+      cb(null, `${base}-${timestamp}${ext}`);
+    },
+  });
+
+  const fileFilter = (req, file, cb) => {
+    if (allowedMimeTypes.length === 0 || allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type"), false);
+    }
+  };
+
+  return multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: maxSizeMB * 1024 * 1024 },
+  });
+};
 
 module.exports = upload;

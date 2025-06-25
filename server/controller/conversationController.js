@@ -45,7 +45,10 @@ exports.createOrGetConversation = async (req, res) => {
       members: [req.user._id, otherUser._id],
     });
 
-    const fullConversation = await conversation.populate("members", "-password");
+    const fullConversation = await conversation.populate(
+      "members",
+      "-password"
+    );
     res.status(201).json(fullConversation);
   } catch (error) {
     console.error("createOrGetConversation error:", error);
@@ -128,19 +131,28 @@ exports.createGroupChat = async (req, res) => {
     }
 
     if (!Array.isArray(members) || members.length < 2) {
-      return res.status(400).json({ message: "At least 2 group members required" });
+      return res
+        .status(400)
+        .json({ message: "At least 2 group members required" });
     }
 
     const users = await User.find({ _id: { $in: members } });
 
     if (!users.length || users.length < 2) {
-      return res.status(404).json({ message: "Minimum 2 valid users required." });
+      return res
+        .status(404)
+        .json({ message: "Minimum 2 valid users required." });
     }
 
-    const allUserIds = [...users.map((u) => u._id.toString()), req.user._id.toString()];
+    const allUserIds = [
+      ...users.map((u) => u._id.toString()),
+      req.user._id.toString(),
+    ];
     const uniqueUserIds = [...new Set(allUserIds)];
 
-    const groupPic = req.file ? `/uploads/groupPics/${req.file.filename}` : undefined;
+    const groupPic = req.file
+      ? `/uploads/groupPics/${req.file.filename}`
+      : undefined;
 
     const groupChat = await Conversation.create({
       name: name.trim(),
@@ -188,12 +200,7 @@ exports.addMemberToGroup = async (req, res) => {
     const addedUser = await User.findById(userIdToAdd);
     const msg = `${req.user.username} added ${addedUser.username} to the group`;
 
-    await Message.create({
-      sender: req.user._id,
-      text: msg,
-      isSystem: true,
-      conversation: conversationId,
-    });
+    await emitSystemMessage(req, conversationId, msg);
 
     const updatedGroup = await Conversation.findById(conversationId)
       .populate("members", "-password")
@@ -231,12 +238,7 @@ exports.removeGroupMember = async (req, res) => {
     const removedUser = await User.findById(userId);
     const msg = `${req.user.username} removed ${removedUser.username} from the group`;
 
-    await Message.create({
-      sender: req.user._id,
-      text: msg,
-      isSystem: true,
-      conversation: conversationId,
-    });
+    await emitSystemMessage(req, conversationId, msg);
 
     const updatedGroup = await Conversation.findById(conversationId)
       .populate("members", "-password")
@@ -265,7 +267,9 @@ exports.deleteGroupChat = async (req, res) => {
       !conversation.groupAdmin ||
       conversation.groupAdmin.toString() !== req.user._id.toString()
     ) {
-      return res.status(403).json({ message: "Only admin can delete the group chat" });
+      return res
+        .status(403)
+        .json({ message: "Only admin can delete the group chat" });
     }
 
     await Conversation.findByIdAndDelete(req.params.id);
@@ -351,52 +355,51 @@ exports.getConversationDetails = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 exports.updateGroupChat = async (req, res) => {
-  const { conversationId, name } = req.body;
-
-  if (!conversationId)
-    return res.status(400).json({ message: "conversationId required" });
-
   try {
-    const group = await Conversation.findById(conversationId);
-    if (!group || !group.isGroupChat)
+    const { conversationId, name } = req.body;
+    const imageUrl = req.file?.filename;
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (imageUrl) updateData.groupPic = imageUrl;
+
+    const updatedGroup = await Conversation.findByIdAndUpdate(
+      conversationId,
+      updateData,
+      { new: true }
+    ).populate("members", "-password");
+
+    if (!updatedGroup) {
       return res.status(404).json({ message: "Group not found" });
-
-    if (group.groupAdmin.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Only group admin can update" });
     }
 
-    let systemMsg = null;
-
-    if (name && name !== group.name) {
-      systemMsg = `${req.user.username} changed group name to \"${name}\"`;
-      group.name = name;
-    }
-
-    if (req.file) {
-      systemMsg = `${req.user.username} changed the group display picture`;
-      group.groupPic = `/uploads/groupPics/${req.file.filename}`;
-    }
-
-    await group.save();
-
-    if (systemMsg) {
-      await Message.create({
-        sender: req.user._id,
-        text: systemMsg,
-        isSystem: true,
-        conversation: conversationId,
-      });
-    }
-
-    const updatedGroup = await Conversation.findById(group._id)
-      .populate("members", "-password")
-      .populate("groupAdmin", "-password");
-
-    res.status(200).json(updatedGroup);
-  } catch (err) {
-    console.error("❌ updateGroupChat error:", err);
-    res.status(500).json({ message: err.message });
+    return res.status(200).json(updatedGroup);
+  } catch (error) {
+    console.error("❌ updateGroupChat error:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
+};
+
+const emitSystemMessage = async (req, conversationId, text) => {
+  const io = req.app.get("io");
+  const message = await Message.create({
+    sender: req.user._id,
+    text,
+    isSystem: true,
+    conversation: conversationId,
+  });
+
+  io.to(conversationId).emit("message-received", {
+    _id: message._id,
+    text: message.text,
+    isSystem: true,
+    sender: {
+      _id: req.user._id,
+      username: req.user.username,
+      profilePic: req.user.profilePic,
+    },
+    conversation: conversationId,
+    createdAt: message.createdAt,
+  });
 };

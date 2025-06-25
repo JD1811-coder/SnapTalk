@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const multer = require('multer');
-
 const {
   createOrGetConversation,
   getUserConversations,
@@ -29,5 +28,6 @@ router.delete('/group/delete-group/:id', protect, deleteGroupChat);
 router.post('/mark-as-read', protect, markMessagesAsRead);
 router.get('/details/:conversationId', protect,getConversationDetails);
 router.patch('/group/update', protect, upload.single('groupPic'), updateGroupChat);
+
 
 module.exports = router;

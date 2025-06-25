@@ -1,46 +1,42 @@
 const Message = require('../model/message');
 const Conversation = require('../model/conversation');
 
-exports.sendMessage = async (req, res) => {
-  const { text, conversationId } = req.body;
+  exports.sendMessage = async (req, res) => {
+    const { text, conversationId } = req.body;
+    const file = req.file;
 
-  if (!text || !conversationId) {
-    return res.status(400).json({ message: 'Text and conversationId are required' });
-  }
+    if (!text && !file) {
+      return res.status(400).json({ message: "Text or file is required" });
+    }
 
-  try {
-    const newMessage = await Message.create({
-      sender: req.user._id,
-      text,
-      conversation: conversationId,
-    });
+    try {
+      const newMessage = await Message.create({
+        sender: req.user._id,
+        text,
+        file: file ? `/uploads/${file.filename}` : null,
+        conversation: conversationId,
+      });
 
-    await Conversation.findByIdAndUpdate(conversationId, {
-      latestMessage: newMessage._id,
-    });
+      await Conversation.findByIdAndUpdate(conversationId, {
+        latestMessage: newMessage._id,
+      });
 
-    const fullMessage = await newMessage.populate('sender', '-password');
+      const fullMessage = await newMessage.populate("sender", "-password");
 
-    // ✅ Add conversationId explicitly
-    const finalMessage = {
-      ...fullMessage.toObject(),
-      conversationId: fullMessage.conversation.toString(),
-    };
+      const finalMessage = {
+        ...fullMessage.toObject(),
+        conversationId: fullMessage.conversation.toString(),
+      };
 
+      const io = req.app.get("io");
+      io.to(conversationId).emit("message-received", finalMessage);
 
-    const io = req.app.get('io'); 
-    console.log('Emitting newMessage to room:', conversationId, finalMessage);
-    io.to(conversationId).emit('message-received', finalMessage);
+      res.status(201).json(finalMessage);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 
-
-
-    res.status(201).json(finalMessage);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-
-
-};
 exports.getMessages = async (req, res) => {
   const { conversationId } = req.params;
   const userId = req.user._id;
@@ -137,5 +133,30 @@ exports.markMessagesAsRead = async (req, res) => {
     res.status(200).json({ message: 'Messages marked as read' });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};exports.reactToMessage = async (req, res) => {
+  const { messageId, emoji } = req.body;
+  const userId = req.user._id;
+
+  try {
+    const message = await Message.findById(messageId).populate('reactions.user');
+    const existing = message.reactions.find(
+      (r) => r.user.toString() === userId.toString() && r.emoji === emoji
+    );
+
+    if (existing) {
+      message.reactions = message.reactions.filter(
+        (r) => !(r.user.toString() === userId.toString() && r.emoji === emoji)
+      );
+    } else {
+      message.reactions.push({ user: userId, emoji });
+    }
+
+    await message.save();
+    const updated = await Message.findById(messageId).populate('reactions.user');
+    io.emit('reaction-updated', updated); // 🔥 Emit to everyone
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: 'Reaction failed', error: err.message });
   }
 };

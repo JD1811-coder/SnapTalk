@@ -1,0 +1,12 @@
+{
+  "resolutions": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "dependencies": {
+    "@joeattardi/emoji-button": "^4.6.4",
+    "emoji-picker-react": "^4.12.2",
+    "framer-motion": "^12.19.1",
+    "react-emoji-picker": "^1.0.13"
+  }
+}
