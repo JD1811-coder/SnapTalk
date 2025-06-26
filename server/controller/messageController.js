@@ -1,7 +1,11 @@
-const Message = require('../model/message');
-const Conversation = require('../model/conversation');
+const Message = require("../model/message");
+const Conversation = require("../model/conversation");
 
-  exports.sendMessage = async (req, res) => {
+exports.sendMessage = async (req, res) => {
+  try {
+    console.log("📨 BODY:", req.body);
+    console.log("📎 FILE:", req.file);
+
     const { text, conversationId } = req.body;
     const file = req.file;
 
@@ -9,33 +13,33 @@ const Conversation = require('../model/conversation');
       return res.status(400).json({ message: "Text or file is required" });
     }
 
-    try {
-      const newMessage = await Message.create({
-        sender: req.user._id,
-        text,
-        file: file ? `/uploads/${file.filename}` : null,
-        conversation: conversationId,
-      });
+    const newMessage = await Message.create({
+      sender: req.user._id,
+      text,
+      file: file ? `/uploads/${file.filename}` : null,
+      conversation: conversationId,
+    });
 
-      await Conversation.findByIdAndUpdate(conversationId, {
-        latestMessage: newMessage._id,
-      });
+    await Conversation.findByIdAndUpdate(conversationId, {
+      latestMessage: newMessage._id,
+    });
 
-      const fullMessage = await newMessage.populate("sender", "-password");
+    const fullMessage = await newMessage.populate("sender", "-password");
 
-      const finalMessage = {
-        ...fullMessage.toObject(),
-        conversationId: fullMessage.conversation.toString(),
-      };
+    const finalMessage = {
+      ...fullMessage.toObject(),
+      conversationId: fullMessage.conversation.toString(),
+    };
 
-      const io = req.app.get("io");
-      io.to(conversationId).emit("message-received", finalMessage);
+    const io = req.app.get("io");
+    io.to(conversationId).emit("message-received", finalMessage);
 
-      res.status(201).json(finalMessage);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  };
+    res.status(201).json(finalMessage);
+  } catch (err) {
+    console.error("💥 Backend error in sendMessage:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
 
 exports.getMessages = async (req, res) => {
   const { conversationId } = req.params;
@@ -43,20 +47,20 @@ exports.getMessages = async (req, res) => {
 
   try {
     const msgs = await Message.find({ conversation: conversationId })
-      .sort('createdAt')
-      .populate('sender', 'username profilePic');
+      .sort("createdAt")
+      .populate("sender", "username profilePic");
 
     // Mark unread messages as read by current user
-    const unreadMessages = msgs.filter(m => !m.readBy.includes(userId));
+    const unreadMessages = msgs.filter((m) => !m.readBy.includes(userId));
     await Message.updateMany(
-      { _id: { $in: unreadMessages.map(m => m._id) } },
+      { _id: { $in: unreadMessages.map((m) => m._id) } },
       { $push: { readBy: userId } }
     );
 
     res.json(msgs);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error fetching messages' });
+    res.status(500).json({ message: "Server error fetching messages" });
   }
 };
 
@@ -69,17 +73,20 @@ exports.updateMessage = async (req, res) => {
       id,
       {
         text,
-        isEdited: true
+        isEdited: true,
       },
       { new: true }
-    ).populate('sender', '-password');
+    ).populate("sender", "-password");
 
     if (!updatedMessage) {
-      return res.status(404).json({ message: 'Message not found' });
+      return res.status(404).json({ message: "Message not found" });
     }
 
-    const io = req.app.get('io');
-    io.to(updatedMessage.conversation.toString()).emit('message-edited', updatedMessage);
+    const io = req.app.get("io");
+    io.to(updatedMessage.conversation.toString()).emit(
+      "message-edited",
+      updatedMessage
+    );
 
     res.status(200).json(updatedMessage);
   } catch (error) {
@@ -94,16 +101,16 @@ exports.deleteMessage = async (req, res) => {
     const deletedMessage = await Message.findByIdAndDelete(id);
 
     if (!deletedMessage) {
-      return res.status(404).json({ message: 'Message not found' });
+      return res.status(404).json({ message: "Message not found" });
     }
 
-    const io = req.app.get('io');
-    io.to(deletedMessage.conversation.toString()).emit('message-deleted', {
+    const io = req.app.get("io");
+    io.to(deletedMessage.conversation.toString()).emit("message-deleted", {
       _id: deletedMessage._id,
-      conversation: deletedMessage.conversation
+      conversation: deletedMessage.conversation,
     });
 
-    res.status(200).json({ message: 'Message deleted successfully' });
+    res.status(200).json({ message: "Message deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -113,33 +120,36 @@ exports.markMessagesAsRead = async (req, res) => {
   const { conversationId } = req.body;
 
   if (!conversationId) {
-    return res.status(400).json({ message: 'conversationId is required' });
+    return res.status(400).json({ message: "conversationId is required" });
   }
 
   try {
     // Find all unread messages in the conversation for this user
     const messages = await Message.updateMany(
-      { 
+      {
         conversation: conversationId,
-        readBy: { $ne: userId }
+        readBy: { $ne: userId },
       },
       { $push: { readBy: userId } }
     );
 
     // Emit socket event for read receipt
-    const io = req.app.get('io');
-    io.to(conversationId).emit('message-read', { userId, conversationId });
+    const io = req.app.get("io");
+    io.to(conversationId).emit("message-read", { userId, conversationId });
 
-    res.status(200).json({ message: 'Messages marked as read' });
+    res.status(200).json({ message: "Messages marked as read" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};exports.reactToMessage = async (req, res) => {
+};
+exports.reactToMessage = async (req, res) => {
   const { messageId, emoji } = req.body;
   const userId = req.user._id;
 
   try {
-    const message = await Message.findById(messageId).populate('reactions.user');
+    const message = await Message.findById(messageId).populate(
+      "reactions.user"
+    );
     const existing = message.reactions.find(
       (r) => r.user.toString() === userId.toString() && r.emoji === emoji
     );
@@ -153,10 +163,12 @@ exports.markMessagesAsRead = async (req, res) => {
     }
 
     await message.save();
-    const updated = await Message.findById(messageId).populate('reactions.user');
-    io.emit('reaction-updated', updated); // 🔥 Emit to everyone
+    const updated = await Message.findById(messageId).populate(
+      "reactions.user"
+    );
+    io.emit("reaction-updated", updated); // 🔥 Emit to everyone
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ message: 'Reaction failed', error: err.message });
+    res.status(500).json({ message: "Reaction failed", error: err.message });
   }
 };
