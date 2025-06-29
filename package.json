@@ -4,6 +4,8 @@
     "react-dom": "^19.1.0"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
     "@joeattardi/emoji-button": "^4.6.4",
     "emoji-picker-react": "^4.12.2",
     "framer-motion": "^12.19.1",

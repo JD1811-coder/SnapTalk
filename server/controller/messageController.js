@@ -142,33 +142,35 @@ exports.markMessagesAsRead = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-exports.reactToMessage = async (req, res) => {
-  const { messageId, emoji } = req.body;
-  const userId = req.user._id;
-
+// ✅ Add Reaction
+exports.addReaction = async (req, res) => {
   try {
-    const message = await Message.findById(messageId).populate(
-      "reactions.user"
-    );
-    const existing = message.reactions.find(
-      (r) => r.user.toString() === userId.toString() && r.emoji === emoji
-    );
+    const { messageId, emoji } = req.body;
+    console.log("📥 Reaction API called with:", { messageId, emoji });
 
-    if (existing) {
-      message.reactions = message.reactions.filter(
-        (r) => !(r.user.toString() === userId.toString() && r.emoji === emoji)
-      );
-    } else {
-      message.reactions.push({ user: userId, emoji });
+    if (!messageId || !emoji) {
+      return res.status(400).json({ message: "Missing messageId or emoji" });
     }
 
+    if (!req.user) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    const reaction = { emoji, username: req.user.username };
+    message.reactions.push(reaction);
+
     await message.save();
-    const updated = await Message.findById(messageId).populate(
-      "reactions.user"
-    );
-    io.emit("reaction-updated", updated); // 🔥 Emit to everyone
-    res.json(updated);
+
+    console.log("✅ Reaction saved:", reaction);
+
+    res.json({ reaction });
   } catch (err) {
-    res.status(500).json({ message: "Reaction failed", error: err.message });
+    console.error("🔥 Reaction add error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };

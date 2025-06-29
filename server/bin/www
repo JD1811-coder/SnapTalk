@@ -30,6 +30,21 @@ io.on('connection', (socket) => {
     socket.join(userId); // 👈 this makes individual events possible
     console.log(`✅ Socket ${socket.id} joined personal room: ${userId}`);
   }
+  socket.on("message-reaction", async ({ messageId, emoji }) => {
+  const message = await Message.findById(messageId);
+  if (!message) return;
+
+  // Optional: prevent duplicate reactions per user
+  const existing = message.reactions.find(
+    (r) => r.userId.toString() === socket.userId && r.emoji === emoji
+  );
+  if (!existing) {
+    message.reactions.push({ userId: socket.userId, emoji });
+    await message.save();
+  }
+
+  io.to(message.conversation.toString()).emit("reaction-updated", message);
+});
 
   socket.on('joinRoom', (roomId) => {
     socket.join(roomId);

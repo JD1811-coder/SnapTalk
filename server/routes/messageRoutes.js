@@ -14,6 +14,6 @@ router.get("/:conversationId", protect, messageController.getMessages);
 router.patch("/read", protect, messageController.markMessagesAsRead);
 router.patch("/:id", protect, messageController.updateMessage);
 router.delete("/:id", protect, messageController.deleteMessage);
-router.post("/react", protect, messageController.reactToMessage);
+router.post("/add-reaction", protect, messageController.addReaction);
 
 module.exports = router;

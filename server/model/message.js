@@ -26,15 +26,14 @@ const messageSchema = new mongoose.Schema(
       default: false,
     },
     reactions: [
-  {
-    emoji: String,
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-    },
-  },
-],
-
+      {
+        emoji: String,
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+      },
+    ],
 
     readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     unreadBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
