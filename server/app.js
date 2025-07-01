@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const createError = require('http-errors');
 const mongoose = require('mongoose');
+const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -38,6 +39,7 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
 app.use('/api/conversation', require('./routes/conversationRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use("/api/admin", adminRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

@@ -48,7 +48,8 @@ exports.getMessages = async (req, res) => {
   try {
     const msgs = await Message.find({ conversation: conversationId })
       .sort("createdAt")
-      .populate("sender", "username profilePic");
+      .populate("sender", "username profilePic")
+      .populate("reactions.user", "username profilePic"); // ✅ populate user in reactions
 
     // Mark unread messages as read by current user
     const unreadMessages = msgs.filter((m) => !m.readBy.includes(userId));
@@ -142,7 +143,6 @@ exports.markMessagesAsRead = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-// ✅ Add Reaction
 exports.addReaction = async (req, res) => {
   try {
     const { messageId, emoji } = req.body;
@@ -161,16 +161,28 @@ exports.addReaction = async (req, res) => {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    const reaction = { emoji, username: req.user.username };
+    // Remove previous reaction by this user if exists
+    message.reactions = message.reactions.filter(
+      (r) => r.user.toString() !== req.user._id.toString()
+    );
+
+    // Add new reaction
+    const reaction = { emoji, user: req.user._id };
     message.reactions.push(reaction);
 
     await message.save();
 
+    // Populate reactions to return usernames for frontend tooltip
+    const updatedMessage = await Message.findById(messageId).populate(
+      "reactions.user",
+      "username profilePic"
+    );
+
     console.log("✅ Reaction saved:", reaction);
 
-    res.json({ reaction });
+    res.json({ reactions: updatedMessage.reactions });
   } catch (err) {
     console.error("🔥 Reaction add error:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
+    res.status(500).json({ message: "Server error", error: err.message, stack: err.stack });
   }
 };
