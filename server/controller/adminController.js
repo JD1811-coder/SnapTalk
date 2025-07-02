@@ -2,7 +2,6 @@ const User = require("../model/user");
 const Message = require("../model/message");
 const Conversation = require("../model/conversation");
 
-
 /**
  * Get all users
  */
@@ -75,11 +74,11 @@ exports.toggleBlockUser = async (req, res) => {
 };
 
 /**
- * Get all groups
+ * Get all groups (from conversations where isGroup: true)
  */
 exports.getAllGroups = async (req, res) => {
   try {
-    const groups = await Group.find();
+    const groups = await Conversation.find({ isGroup: true }).populate("participants", "username profilePic");
     res.json({
       success: true,
       data: groups,
@@ -95,11 +94,11 @@ exports.getAllGroups = async (req, res) => {
 };
 
 /**
- * Delete a group by ID
+ * Delete a group by ID (delete conversation with isGroup: true)
  */
 exports.deleteGroup = async (req, res) => {
   try {
-    const group = await Group.findByIdAndDelete(req.params.id);
+    const group = await Conversation.findOneAndDelete({ _id: req.params.id, isGroup: true });
     if (!group)
       return res
         .status(404)
@@ -123,16 +122,24 @@ exports.deleteGroup = async (req, res) => {
  */
 exports.getAllConversations = async (req, res) => {
   try {
-    const conversations = await Conversation.find().populate(
-      "participants",
-      "username profilePic"
-    );
+    const conversations = await Conversation.find()
+      .populate("members", "username profilePic")
+      .populate("groupAdmin", "username profilePic")
+      .populate({
+        path: "latestMessage",
+        populate: {
+          path: "sender",
+          select: "username profilePic",
+        },
+      });
+
     res.json({
       success: true,
       data: conversations,
       message: "Fetched all conversations successfully",
     });
   } catch (err) {
+    console.error("🔥 Error in getAllConversations:", err);
     res.status(500).json({
       success: false,
       message: "Server error while fetching conversations",
@@ -140,6 +147,7 @@ exports.getAllConversations = async (req, res) => {
     });
   }
 };
+
 
 /**
  * Delete a message by ID

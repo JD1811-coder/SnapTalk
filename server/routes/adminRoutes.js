@@ -9,7 +9,7 @@ router.get("/users", protect, isAdmin, adminController.getAllUsers);
 router.delete("/users/:id", protect, isAdmin, adminController.deleteUser);
 router.patch("/users/:id/block", protect, isAdmin, adminController.toggleBlockUser);
 
-// Group management
+// Group management (from conversations where isGroup: true)
 router.get("/groups", protect, isAdmin, adminController.getAllGroups);
 router.delete("/groups/:id", protect, isAdmin, adminController.deleteGroup);
 

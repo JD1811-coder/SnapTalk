@@ -1,20 +1,17 @@
 const jwt = require("jsonwebtoken");
-const Admin = require("../model/admin");
 
-const adminProtect = async (req, res, next) => {
-  let token;
+const adminProtect = (req, res, next) => {
+  const token = req.cookies.adminToken;
+  if (!token)
+    return res.status(401).json({ message: "Not authorized, token missing" });
 
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.admin = await Admin.findById(decoded.id).select("-password");
-      next();
-    } catch (err) {
-      res.status(401).json({ message: "Admin not authorized", error: err.message });
-    }
-  } else {
-    res.status(401).json({ message: "No token, admin not authorized" });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.admin = decoded;
+    next();
+  } catch (err) {
+    console.error("🔥 Invalid admin token:", err);
+    res.status(401).json({ message: "Not authorized, invalid token" });
   }
 };
 

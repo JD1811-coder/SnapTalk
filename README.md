@@ -40,3 +40,13 @@ npm start
 cd server
 npm install
 node index.js
+
+<!-- Admin ID & Password -->
+
+{
+  "_id": {
+    "username": "Admin",
+    "email":"Admin@gmail.com",
+    "password":"Admin@123",
+  }
+}

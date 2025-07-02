@@ -7,6 +7,8 @@ const logger = require('morgan');
 const createError = require('http-errors');
 const mongoose = require('mongoose');
 const adminRoutes = require("./routes/adminRoutes");
+const adminAuthRoutes = require("./routes/adminAuthRoutes");
+
 
 const app = express();
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -20,8 +22,8 @@ app.use(cors({
 
 // MongoDB connection
 mongoose.connect("mongodb://localhost:27017/SnapTalk")
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((error) => console.error("MongoDB connection error:", error));
+.then(() => console.log("✅ MongoDB connected"))
+.catch((error) => console.error("MongoDB connection error:", error));
 
 // Middleware and routes setup
 app.set('views', path.join(__dirname, 'views'));
@@ -40,6 +42,7 @@ app.use('/api/messages', require('./routes/messageRoutes'));
 app.use('/api/conversation', require('./routes/conversationRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin", adminAuthRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {
