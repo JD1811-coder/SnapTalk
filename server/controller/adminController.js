@@ -78,7 +78,7 @@ exports.toggleBlockUser = async (req, res) => {
  */
 exports.getAllGroups = async (req, res) => {
   try {
-    const groups = await Conversation.find({ isGroup: true }).populate("participants", "username profilePic");
+    const groups = await Conversation.find({ isGroupChat: true }).populate("members", "username profilePic");
     res.json({
       success: true,
       data: groups,
@@ -88,6 +88,44 @@ exports.getAllGroups = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching groups",
+      error: err.message,
+    });
+  }
+};
+exports.getMessagesByConversationId = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const messages = await Message.find({ conversation: conversationId })
+      .populate("sender", "username")
+      .sort({ createdAt: -1 }); // latest first
+
+    res.json({
+      success: true,
+      data: messages,
+      message: "Fetched messages for conversation",
+    });
+  } catch (err) {
+    console.error("Error fetching messages:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching messages",
+      error: err.message,
+    });
+  }
+};
+exports.deleteMessageById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Message.findByIdAndDelete(id);
+    res.json({
+      success: true,
+      message: "Message deleted successfully",
+    });
+  } catch (err) {
+    console.error("Error deleting message:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while deleting message",
       error: err.message,
     });
   }

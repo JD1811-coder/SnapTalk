@@ -17,4 +17,8 @@ router.delete("/groups/:id", protect, isAdmin, adminController.deleteGroup);
 router.get("/conversations", protect, isAdmin, adminController.getAllConversations);
 router.delete("/messages/:id", protect, isAdmin, adminController.deleteMessage);
 
+// Message management
+router.get("/messages/:conversationId", protect, isAdmin, adminController.getMessagesByConversationId);
+router.delete("/messages/:id", protect, isAdmin, adminController.deleteMessageById);
+
 module.exports = router;
