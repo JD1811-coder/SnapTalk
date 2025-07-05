@@ -210,3 +210,39 @@ exports.deleteMessage = async (req, res) => {
     });
   }
 };
+exports.getAdminProfile = async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin.id).select("-password");
+    res.json({ success: true, data: admin });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+exports.toggleDisableUser = async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.isDisabled = !user.isDisabled;
+    await user.save();
+
+    // ✅ Emit real-time disable event if user is disabled
+    if (user.isDisabled) {
+      const io = req.app.get("io"); // get io instance from app
+      io.to(userId).emit("user-disabled", {
+        message: "Your account has been disabled by admin.",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `User ${user.isDisabled ? "disabled" : "enabled"}.`,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

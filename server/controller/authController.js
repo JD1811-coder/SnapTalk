@@ -8,6 +8,9 @@ const generateToken = (id) =>
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
+if (user.isDisabled) {
+  return res.status(403).json({ message: "Your account is disabled. Contact support." });
+}
 
   if (!user || !(await user.matchPassword(password))) {
     return res.status(401).json({ message: 'Invalid credentials' });

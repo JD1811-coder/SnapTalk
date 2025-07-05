@@ -31,11 +31,11 @@ const userSchema = new mongoose.Schema(
     },
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     mutedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    role: {
-      type: String,
-      enum: ["user", "admin"],
-      default: "user",
+    isDisabled: {
+      type: Boolean,
+      default: false
     },
+    
   },
 
   { timestamps: true }

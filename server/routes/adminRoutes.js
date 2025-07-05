@@ -21,4 +21,7 @@ router.delete("/messages/:id", protect, isAdmin, adminController.deleteMessage);
 router.get("/messages/:conversationId", protect, isAdmin, adminController.getMessagesByConversationId);
 router.delete("/messages/:id", protect, isAdmin, adminController.deleteMessageById);
 
+router.get("/me", isAdmin, adminController.getAdminProfile);
+router.patch('/users/:id/toggle-disable', adminController.toggleDisableUser);
+
 module.exports = router;
