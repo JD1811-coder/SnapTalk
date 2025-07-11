@@ -212,13 +212,13 @@ exports.deleteMessage = async (req, res) => {
 };
 exports.getAdminProfile = async (req, res) => {
   try {
-    const admin = await Admin.findById(req.admin.id).select("-password");
-    res.json({ success: true, data: admin });
+    res.json({ success: true, data: req.admin });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+
 exports.toggleDisableUser = async (req, res) => {
   const userId = req.params.id;
 
@@ -246,3 +246,4 @@ exports.toggleDisableUser = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+

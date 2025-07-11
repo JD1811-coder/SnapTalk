@@ -1,6 +1,7 @@
 const Admin = require("../model/Admin");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 exports.adminRegister = async (req, res) => {
   try {
@@ -85,4 +86,75 @@ exports.adminVerify = (req, res) => {
     console.error("🔥 Admin verify error:", err);
     res.status(401).json({ message: "Not authenticated" });
   }
+};
+
+
+
+
+const { sendOtpEmail } = require("../utils/emailService");
+
+exports.sendResetOtp = async (req, res) => {
+  const { email } = req.body;
+  const admin = await Admin.findOne({ email });
+
+  if (!admin) {
+    return res.status(404).json({ message: "Admin not found" });
+  }
+
+  const otp = generateOtp();
+  admin.resetOtp = otp;
+  admin.resetOtpExpire = Date.now() + 10 * 60 * 1000; // 10 mins expiry
+  await admin.save();
+
+
+
+  try {
+    await sendOtpEmail(email, otp);
+    console.log(`✅ OTP email sent to ${email}`);
+    res.status(200).json({ message: "OTP sent to registered email" });
+  } catch (err) {
+    console.error("❌ Error sending OTP email:", err);
+    res.status(500).json({ message: "Failed to send OTP email" });
+  }
+};
+
+
+exports.verifyResetOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  const admin = await Admin.findOne({ email, resetOtp: otp, resetOtpExpire: { $gt: Date.now() } });
+
+  if (!admin) {
+    return res.status(400).json({ message: "Invalid or expired OTP" });
+  }
+
+  res.status(200).json({ message: "OTP verified" });
+};
+
+exports.resetPassword = async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  const admin = await Admin.findOne({
+    email,
+    resetOtp: otp,
+    resetOtpExpire: { $gt: Date.now() },
+  });
+
+  if (!admin) {
+    return res.status(400).json({ message: "Invalid or expired OTP" });
+  }
+admin.set("password", newPassword);
+
+
+await Admin.updateOne(
+  { _id: admin._id },
+  {
+    $set: { password: hashedPassword },
+    $unset: { resetOtp: "", resetOtpExpire: "" }
+  }
+);
+
+  await admin.save();
+
+  console.log("✅ Password reset and hashed successfully");
+
+  res.status(200).json({ message: "Password reset successful" });
 };

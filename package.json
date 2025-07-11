@@ -10,6 +10,7 @@
     "bcryptjs": "^3.0.2",
     "emoji-picker-react": "^4.12.2",
     "framer-motion": "^12.19.1",
+    "nodemailer": "^7.0.5",
     "react-emoji-picker": "^1.0.13"
   }
 }
