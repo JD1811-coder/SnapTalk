@@ -11,19 +11,15 @@ const adminSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-adminSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    console.log("Password NOT modified, skipping hash");
-    return next();
-  }
 
-  console.log("Password modified, hashing...");
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+// ✅ Hash password before saving
+adminSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
-// ✅ Method to compare password during login
+// ✅ Compare password method
 adminSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

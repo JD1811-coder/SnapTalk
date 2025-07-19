@@ -1,29 +1,27 @@
 const Admin = require("../model/Admin");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
-
+const generateOtp = () =>
+  Math.floor(100000 + Math.random() * 900000).toString();
 exports.adminRegister = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    console.log("Admin Register Data:", { username, email, password });
-
     if (!username || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
+
+    console.log("Admin Register Data:", { username, email, password });
 
     const existing = await Admin.findOne({ email });
     if (existing) {
       return res.status(400).json({ message: "Admin already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     const admin = await Admin.create({
       username,
       email,
-      password: hashedPassword,
+      password, // Pass raw password; pre-save hook will hash it
     });
 
     res.status(201).json({ message: "Admin registered", adminId: admin._id });
@@ -34,36 +32,50 @@ exports.adminRegister = async (req, res) => {
 };
 
 exports.adminLogin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-    const admin = await Admin.findOne({ email });
-    if (!admin) return res.status(400).json({ message: "Invalid credentials" });
+    console.log("🔐 Login request received:", { email, password });
 
-    const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+    const admin = await Admin.findOne({ email });
 
-    const token = jwt.sign(
-      { id: admin._id, email: admin.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-    res
-      .cookie("adminToken", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 24 * 60 * 60 * 1000,
-      })
-      .json({
-        message: "Login successful",
-        admin: { id: admin._id, username: admin.username, email: admin.email },
-      });
-  } catch (err) {
-    console.error("🔥 Admin login error:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
+    if (!admin) {
+      console.log("⛔ Admin not found");
+      return res.status(400).json({ message: "Invalid credentials (no admin)" });
+    }
+
+    const isMatch = await bcrypt.compare(password, admin.password);
+
+    if (!isMatch) {
+      console.log("❌ Password incorrect");
+      return res.status(400).json({ message: "Invalid credentials (wrong password)" });
+    }
+
+    const token = jwt.sign(
+      { id: admin._id, email: admin.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.cookie("adminToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production" ? true : false,
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      message: "Login successful",
+      admin: {
+        id: admin._id,
+        email: admin.email,
+        username: admin.username,
+      },
+    });
+  } catch (err) {
+    console.error("🔥 Login error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
 };
 
 exports.adminLogout = (req, res) => {
@@ -88,9 +100,6 @@ exports.adminVerify = (req, res) => {
   }
 };
 
-
-
-
 const { sendOtpEmail } = require("../utils/emailService");
 
 exports.sendResetOtp = async (req, res) => {
@@ -106,8 +115,6 @@ exports.sendResetOtp = async (req, res) => {
   admin.resetOtpExpire = Date.now() + 10 * 60 * 1000; // 10 mins expiry
   await admin.save();
 
-
-
   try {
     await sendOtpEmail(email, otp);
     console.log(`✅ OTP email sent to ${email}`);
@@ -118,20 +125,8 @@ exports.sendResetOtp = async (req, res) => {
   }
 };
 
-
 exports.verifyResetOtp = async (req, res) => {
   const { email, otp } = req.body;
-  const admin = await Admin.findOne({ email, resetOtp: otp, resetOtpExpire: { $gt: Date.now() } });
-
-  if (!admin) {
-    return res.status(400).json({ message: "Invalid or expired OTP" });
-  }
-
-  res.status(200).json({ message: "OTP verified" });
-};
-
-exports.resetPassword = async (req, res) => {
-  const { email, otp, newPassword } = req.body;
   const admin = await Admin.findOne({
     email,
     resetOtp: otp,
@@ -141,20 +136,43 @@ exports.resetPassword = async (req, res) => {
   if (!admin) {
     return res.status(400).json({ message: "Invalid or expired OTP" });
   }
-admin.set("password", newPassword);
+
+  res.status(200).json({ message: "OTP verified" });
+};
 
 
-await Admin.updateOne(
-  { _id: admin._id },
-  {
-    $set: { password: hashedPassword },
-    $unset: { resetOtp: "", resetOtpExpire: "" }
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    const admin = await Admin.findOne({
+      email,
+      resetOtp: otp,
+      resetOtpExpire: { $gt: Date.now() },
+    });
+
+    if (!admin) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    console.log("🔑 New password send in request:", newPassword);
+    console.log("📌 Before reset, old password hash:", admin.password);
+
+    // ✅ Manually hash the new password (skip relying on schema’s pre-save)
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    admin.password = hashedPassword;
+
+    // Clear OTP fields
+    admin.resetOtp = undefined;
+    admin.resetOtpExpire = undefined;
+
+    await admin.save();
+
+    console.log("✅ Password successfully reset and hashed:", admin.password);
+    res.status(200).json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error("❌ Error during password reset:", error.message);
+    res.status(500).json({ message: "Server error" });
   }
-);
-
-  await admin.save();
-
-  console.log("✅ Password reset and hashed successfully");
-
-  res.status(200).json({ message: "Password reset successful" });
 };
